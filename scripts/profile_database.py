@@ -1,50 +1,53 @@
 #!/usr/bin/env python3
 """
-Database Performance Profiling Script
-Profiles critical queries and provides performance metrics
+Script Đo Lường Hiệu Suất Cơ Sở Dữ Liệu
+Đo lường thời gian chạy của các truy vấn (queries) quan trọng 
+và cung cấp các chỉ số hiệu suất chi tiết.
 """
 
 import mysql.connector
 import time
 import sys
 
-# Database connection - UPDATE THESE VALUES
+# Cấu hình kết nối cơ sở dữ liệu - CẦN CẬP NHẬT CÁC GIÁ TRỊ NÀY CHO PHÙ HỢP
 config = {
-    'user': 'loan_app',
-    'password': 'your_password',  # UPDATE THIS
+    'user': 'root',
+    'password': '26052004',  # CẬP NHẬT MẬT KHẨU TẠI ĐÂY
     'host': 'localhost',
-    'database': 'loan_management'
-}
+    'database': 'loan_management',
+    'use_pure': True
+} 
 
 def explain_query(query, name):
-    """Explain a query"""
+    """Hàm phân tích câu truy vấn (sử dụng lệnh EXPLAIN của MySQL)"""
     try:
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
         
+        # Chạy EXPLAIN để xem kế hoạch thực thi (execution plan)
         cursor.execute(f"EXPLAIN {query}")
         results = cursor.fetchall()
         
-        print(f"\n{name} - EXPLAIN:")
+        print(f"\n{name} - Bảng phân tích EXPLAIN:")
         print("-" * 60)
         if results:
-            # Print header
+            # In ra tiêu đề các cột
             columns = [desc[0] for desc in cursor.description]
             print("  " + " | ".join(columns))
             print("  " + "-" * 60)
-            # Print rows
+            # In ra các dòng dữ liệu giải thích
             for row in results:
                 print("  " + " | ".join(str(val) for val in row))
         else:
-            print("  No execution plan available")
+            print("  Không có thông tin kế hoạch thực thi.")
         
         cursor.close()
         conn.close()
     except mysql.connector.Error as e:
-        print(f"  Error: {e}")
+        print(f"  Lỗi cơ sở dữ liệu: {e}")
 
 def profile_query(query, name, iterations=10):
-    """Profile a query"""
+    """Hàm đo lường thời gian chạy thực tế của truy vấn (lặp lại nhiều lần)"""
     try:
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
@@ -52,41 +55,43 @@ def profile_query(query, name, iterations=10):
         times = []
         row_counts = []
         
+        # Thực thi truy vấn nhiều lần (iterations) để lấy kết quả trung bình chính xác
         for i in range(iterations):
             start = time.time()
             cursor.execute(query)
             results = cursor.fetchall()
-            elapsed = (time.time() - start) * 1000  # Convert to ms
+            elapsed = (time.time() - start) * 1000  # Chuyển đổi sang milliseconds (ms)
             times.append(elapsed)
             row_counts.append(len(results))
         
         cursor.close()
         conn.close()
         
+        # Tính toán các chỉ số thống kê
         avg_time = sum(times) / len(times)
         min_time = min(times)
         max_time = max(times)
         avg_rows = sum(row_counts) / len(row_counts)
         
-        print(f"\n{name} - Performance:")
+        print(f"\n{name} - Kết quả Đo lường Hiệu suất:")
         print("-" * 60)
-        print(f"  Average: {avg_time:.2f} ms")
-        print(f"  Min: {min_time:.2f} ms")
-        print(f"  Max: {max_time:.2f} ms")
-        print(f"  Average Rows: {avg_rows:.0f}")
-        print(f"  Iterations: {iterations}")
+        print(f"  Thời gian trung bình: {avg_time:.2f} ms")
+        print(f"  Thời gian nhanh nhất: {min_time:.2f} ms")
+        print(f"  Thời gian chậm nhất: {max_time:.2f} ms")
+        print(f"  Số dòng trả về TB: {avg_rows:.0f}")
+        print(f"  Số lần chạy thử: {iterations}")
         
-        # Performance assessment
+        # Đánh giá hiệu suất truy vấn
         if avg_time < 100:
-            status = "✓ EXCELLENT"
+            status = "✓ XUẤT SẮC (EXCELLENT)"
         elif avg_time < 500:
-            status = "✓ GOOD"
+            status = "✓ TỐT (GOOD)"
         elif avg_time < 2000:
-            status = "⚠ ACCEPTABLE"
+            status = "⚠ CHẤP NHẬN ĐƯỢC (ACCEPTABLE)"
         else:
-            status = "✗ NEEDS OPTIMIZATION"
+            status = "✗ CẦN TỐI ƯU HÓA (NEEDS OPTIMIZATION)"
         
-        print(f"  Status: {status}")
+        print(f"  Đánh giá: {status}")
         
         return {
             'name': name,
@@ -98,10 +103,10 @@ def profile_query(query, name, iterations=10):
             'status': status
         }
     except mysql.connector.Error as e:
-        print(f"  Error: {e}")
+        print(f"  Lỗi cơ sở dữ liệu: {e}")
         return None
 
-# Critical queries to profile
+# Danh sách các câu truy vấn quan trọng cần kiểm tra hiệu suất
 queries = [
     (
         """
@@ -122,7 +127,7 @@ queries = [
         ORDER BY ps.due_date ASC
         LIMIT 100
         """,
-        "Overdue Payments Query (CRITICAL)"
+        "Truy vấn Lịch trả nợ quá hạn (QUAN TRỌNG NHẤT)"
     ),
     (
         """
@@ -139,7 +144,7 @@ queries = [
         WHERE la.customer_id = 1
         ORDER BY la.submitted_at DESC
         """,
-        "Customer Applications Query"
+        "Truy vấn Hồ sơ Đơn xin vay của Khách hàng"
     ),
     (
         """
@@ -157,14 +162,14 @@ queries = [
         GROUP BY c.contract_id
         LIMIT 100
         """,
-        "Active Contracts Query"
+        "Truy vấn Hợp đồng đang hoạt động trong vòng 1 năm"
     ),
     (
         """
         SELECT * FROM customers 
         WHERE phone = '0912345678'
         """,
-        "Customer Lookup by Phone"
+        "Truy vấn Tìm khách hàng theo số điện thoại"
     ),
     (
         """
@@ -173,34 +178,35 @@ queries = [
         ORDER BY submitted_at ASC
         LIMIT 50
         """,
-        "Pending Applications Query"
+        "Truy vấn Đơn xin vay đang chờ xử lý"
     )
 ]
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("Database Performance Profiling")
+    print("Công Cụ Đo Lường Hiệu Suất Cơ Sở Dữ Liệu")
     print("=" * 60)
     
     results = []
+    # Lặp qua từng câu truy vấn và thực hiện đo lường
     for query, name in queries:
         explain_query(query, name)
         result = profile_query(query, name, iterations=10)
         if result:
             results.append(result)
     
+    # In ra báo cáo tóm tắt
     print("\n" + "=" * 60)
-    print("Summary:")
+    print("Báo Cáo Tóm Tắt:")
     print("=" * 60)
     for result in results:
         print(f"{result['name']}")
-        print(f"  Average Time: {result['avg_time']:.2f} ms - {result['status']}")
+        print(f"  Thời gian TB: {result['avg_time']:.2f} ms - {result['status']}")
     
     print("\n" + "=" * 60)
-    print("Performance Targets:")
-    print("  ✓ EXCELLENT: < 100 ms")
-    print("  ✓ GOOD: < 500 ms")
-    print("  ⚠ ACCEPTABLE: < 2000 ms")
-    print("  ✗ NEEDS OPTIMIZATION: >= 2000 ms")
+    print("Tiêu Chuẩn Đánh Giá Hiệu Suất:")
+    print("  ✓ XUẤT SẮC: < 100 ms (Tuyệt vời)")
+    print("  ✓ TỐT: < 500 ms (Phù hợp cho hầu hết truy vấn)")
+    print("  ⚠ CHẤP NHẬN ĐƯỢC: < 2000 ms (Nên tối ưu nếu dùng thường xuyên)")
+    print("  ✗ CẦN TỐI ƯU HÓA: >= 2000 ms (Quá chậm, bắt buộc phải index hoặc tối ưu câu lệnh)")
     print("=" * 60)
-

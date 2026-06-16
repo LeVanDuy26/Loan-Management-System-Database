@@ -122,6 +122,7 @@ CONSTRAINT fk_loan_applications_customer FOREIGN KEY (customer_id) REFERENCES cu
 CONSTRAINT chk_loan_amount_positive CHECK (loan_amount > 0),
 
 -- Kỳ hạn vay phải lớn hơn 0 tháng (phải vay ít nhất 1 tháng)
+
 CONSTRAINT chk_term_months_positive 
         CHECK (requested_term_months > 0)
 

@@ -1,63 +1,66 @@
 #!/usr/bin/env python3
 """
-Database Health Monitoring Script
-Monitors database health metrics and provides status report
+Script Giám Sát Sức Khỏe Cơ Sở Dữ Liệu
+Theo dõi các chỉ số sức khỏe của DB và cung cấp báo cáo trạng thái.
 """
 
 import mysql.connector
 from datetime import datetime
+import sys
 
-# Database connection - UPDATE THESE VALUES
+# Cấu hình kết nối cơ sở dữ liệu - CẦN CẬP NHẬT CÁC GIÁ TRỊ NÀY CHO PHÙ HỢP
 config = {
-    'user': 'loan_app',
-    'password': 'your_password',  # UPDATE THIS
+    'user': 'root',
+    'password': '26052004',  # CẬP NHẬT MẬT KHẨU TẠI ĐÂY
     'host': 'localhost',
-    'database': 'loan_management'
+    'database': 'loan_management',
+    'use_pure': True
 }
 
 def get_status_value(cursor, status_name):
-    """Get a status value"""
+    """Hàm lấy giá trị của một biến trạng thái hệ thống (SHOW STATUS)"""
     cursor.execute(f"SHOW STATUS LIKE '{status_name}'")
     result = cursor.fetchone()
     return int(result[1]) if result else 0
 
 def get_variable_value(cursor, var_name):
-    """Get a variable value"""
+    """Hàm lấy giá trị của một biến cấu hình (SHOW VARIABLES)"""
     cursor.execute(f"SHOW VARIABLES LIKE '{var_name}'")
     result = cursor.fetchone()
     return result[1] if result else None
 
 def monitor_database():
-    """Monitor database health"""
+    """Hàm theo dõi và in báo cáo sức khỏe của cơ sở dữ liệu"""
     try:
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
         
         print("=" * 60)
-        print("Database Health Monitor")
-        print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print("Báo Cáo Sức Khỏe Cơ Sở Dữ Liệu")
+        print(f"Thời gian: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print("=" * 60)
         
-        # Connection metrics
-        print("\n[Connection Metrics]")
+        # 1. Các chỉ số về kết nối (Connection metrics)
+        print("\n[Các Chỉ Số Kết Nối]")
         print("-" * 60)
-        connections = get_status_value(cursor, 'Threads_connected')
-        max_connections = get_variable_value(cursor, 'max_connections')
+        connections = get_status_value(cursor, 'Threads_connected') # Số kết nối hiện tại
+        max_connections = get_variable_value(cursor, 'max_connections') # Giới hạn số kết nối tối đa
         connection_usage = (connections / int(max_connections)) * 100 if max_connections else 0
-        print(f"Active Connections: {connections} / {max_connections} ({connection_usage:.1f}%)")
+        print(f"Số kết nối đang hoạt động: {connections} / {max_connections} (Mức sử dụng: {connection_usage:.1f}%)")
         
-        # Query metrics
-        print("\n[Query Metrics]")
+        # 2. Các chỉ số về truy vấn (Query metrics)
+        print("\n[Các Chỉ Số Truy Vấn (Query)]")
         print("-" * 60)
-        total_queries = get_status_value(cursor, 'Questions')
-        slow_queries = get_status_value(cursor, 'Slow_queries')
+        total_queries = get_status_value(cursor, 'Questions') # Tổng số câu truy vấn đã thực hiện
+        slow_queries = get_status_value(cursor, 'Slow_queries') # Số lượng câu truy vấn chậm (slow queries)
         slow_query_ratio = (slow_queries / total_queries * 100) if total_queries > 0 else 0
-        print(f"Total Queries: {total_queries:,}")
-        print(f"Slow Queries: {slow_queries:,} ({slow_query_ratio:.2f}%)")
+        print(f"Tổng số truy vấn: {total_queries:,}")
+        print(f"Truy vấn chậm (Slow Queries): {slow_queries:,} (Tỷ lệ: {slow_query_ratio:.2f}%)")
         
-        # Table sizes
-        print("\n[Table Sizes]")
+        # 3. Kích thước các bảng (Table sizes)
+        print("\n[Kích Thước Bảng (Top 10 lớn nhất)]")
         print("-" * 60)
+        # Truy vấn thông tin dung lượng bảng từ information_schema
         cursor.execute("""
             SELECT 
                 table_name,
@@ -73,16 +76,17 @@ def monitor_database():
         table_sizes = cursor.fetchall()
         
         if table_sizes:
-            print(f"{'Table':<30} {'Total (MB)':<12} {'Data (MB)':<12} {'Index (MB)':<12} {'Rows':<15}")
+            print(f"{'Bảng':<30} {'Tổng (MB)':<12} {'Dữ liệu (MB)':<12} {'Chỉ mục (MB)':<12} {'Số dòng':<15}")
             print("-" * 60)
             for table, total_size, data_size, index_size, rows in table_sizes:
                 print(f"{table:<30} {total_size:<12} {data_size:<12} {index_size:<12} {rows:<15,}")
         else:
-            print("No tables found")
+            print("Không tìm thấy bảng nào.")
         
-        # Index usage
-        print("\n[Index Usage]")
+        # 4. Sử dụng chỉ mục (Index usage)
+        print("\n[Thông Tin Các Chỉ Mục (Indexes)]")
         print("-" * 60)
+        # Truy vấn danh sách các index trong database
         cursor.execute("""
             SELECT 
                 table_name,
@@ -98,15 +102,15 @@ def monitor_database():
         indexes = cursor.fetchall()
         
         if indexes:
-            print(f"{'Table':<25} {'Index':<25} {'Column':<20} {'Cardinality':<15}")
+            print(f"{'Bảng':<25} {'Chỉ Mục (Index)':<25} {'Cột':<20} {'Độ phân tán (Cardinality)':<15}")
             print("-" * 60)
             for table, index, seq, column, cardinality in indexes:
                 print(f"{table:<25} {index:<25} {column:<20} {cardinality:<15,}")
         else:
-            print("No indexes found")
+            print("Không tìm thấy chỉ mục nào.")
         
-        # Performance metrics
-        print("\n[Performance Metrics]")
+        # 5. Các chỉ số về hiệu suất InnoDB (Performance metrics)
+        print("\n[Chỉ Số Hiệu Suất (InnoDB Buffer Pool)]")
         print("-" * 60)
         innodb_buffer_pool_size = get_variable_value(cursor, 'innodb_buffer_pool_size')
         innodb_buffer_pool_reads = get_status_value(cursor, 'Innodb_buffer_pool_reads')
@@ -114,36 +118,37 @@ def monitor_database():
         
         if innodb_buffer_pool_size:
             buffer_pool_size_mb = int(innodb_buffer_pool_size) / 1024 / 1024
-            print(f"InnoDB Buffer Pool Size: {buffer_pool_size_mb:.0f} MB")
+            print(f"Kích thước bộ đệm InnoDB (Buffer Pool Size): {buffer_pool_size_mb:.0f} MB")
         
+        # Tính tỷ lệ hit ratio - tỷ lệ dữ liệu được đọc trực tiếp từ RAM thay vì ổ cứng
         if innodb_buffer_pool_read_requests > 0:
             hit_ratio = (1 - (innodb_buffer_pool_reads / innodb_buffer_pool_read_requests)) * 100
-            print(f"Buffer Pool Hit Ratio: {hit_ratio:.2f}%")
+            print(f"Tỷ lệ Cache Hit của Buffer Pool: {hit_ratio:.2f}%")
             if hit_ratio < 95:
-                print("  ⚠ WARNING: Low buffer pool hit ratio - consider increasing buffer pool size")
+                print("  ⚠ CẢNH BÁO: Tỷ lệ hit ratio thấp - nên cân nhắc tăng dung lượng buffer pool (innodb_buffer_pool_size)")
         
-        # Health status
-        print("\n[Health Status]")
+        # 6. Đánh giá trạng thái tổng thể (Health status)
+        print("\n[Đánh Giá Trạng Thái Tổng Thể]")
         print("-" * 60)
         issues = []
         
         if connection_usage > 80:
-            issues.append("High connection usage")
+            issues.append("Mức sử dụng kết nối đang ở mức cao (>80%).")
         
         if slow_query_ratio > 1:
-            issues.append("High slow query ratio")
+            issues.append("Tỷ lệ truy vấn chậm khá cao (>1%).")
         
         if innodb_buffer_pool_read_requests > 0:
             hit_ratio = (1 - (innodb_buffer_pool_reads / innodb_buffer_pool_read_requests)) * 100
             if hit_ratio < 95:
-                issues.append("Low buffer pool hit ratio")
+                issues.append("Tỷ lệ cache hit bộ đệm InnoDB thấp (<95%).")
         
         if issues:
-            print("⚠ WARNINGS:")
+            print("⚠ PHÁT HIỆN CÁC VẤN ĐỀ SAU:")
             for issue in issues:
                 print(f"  - {issue}")
         else:
-            print("✓ All metrics within acceptable ranges")
+            print("✓ Hệ thống ổn định. Tất cả các chỉ số đều trong mức cho phép.")
         
         cursor.close()
         conn.close()
@@ -151,9 +156,8 @@ def monitor_database():
         print("\n" + "=" * 60)
         
     except mysql.connector.Error as e:
-        print(f"Error: {e}")
+        print(f"Lỗi cơ sở dữ liệu: {e}")
         sys.exit(1)
 
 if __name__ == '__main__':
     monitor_database()
-
